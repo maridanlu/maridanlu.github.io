@@ -2,6 +2,7 @@
 	
 	var pluginName = 'ik_carousel',
 		defaults = { // default settings
+			'instructions': 'Carousel widget. Use left and reight arrows to navigate between slides.',
 			'animationSpeed' : 3000
 		};
 	 
@@ -34,14 +35,22 @@
 		
 		$elem
 			.attr({
-				'id': id
+				'id': id,
+				'role': 'region', // assign region role
+				'tabindex': 0, // add into the tab order
+				'aria-describedby': id + '_instructions' // associate with instructions
 			})
 			.addClass('ik_carousel')
+			.on('focus', {'plugin': plugin}, plugin.onFocus)
+			.on('blur', {'plugin': plugin}, plugin.onBlur)
+			.on('keydown', {'plugin': plugin}, plugin.onKeyDown)
 			.on('mouseenter', {'plugin': plugin}, plugin.stopTimer)
 			.on('mouseleave', {'plugin': plugin}, plugin.startTimer)
 		
 		$controls = $('<div/>')
-
+			.attr({
+				'aria-hidden': 'true' // hide controls from screen readers
+			})
 			.addClass('ik_controls')
 			.appendTo($elem);
 				
@@ -67,7 +76,10 @@
 				$me = $(el);
 				$src = $me.find('img').remove().attr('src');
 				
-				$me.css({
+				$me.attr({
+					'aria-hidden': 'true' // hide images from screen readers
+					})
+					.css({
 						'background-image': 'url(' + $src + ')'
 					});	
 				
@@ -75,6 +87,17 @@
 					.on('click', {'plugin': plugin, 'slide': i}, plugin.gotoSlide)
 					.appendTo($navbar);
 			});
+
+		plugin.information = $('<div/>') // add instructions for screen reader users
+			.attr({
+				'id': id + '_instructions',
+				'aria-hidden': 'true',		
+				'aria-live': 'polite', // set notofocation priority to high
+				'aria-atomic': 'additions' // notify only about newly added text				
+			})
+			.text('Carousel widget. Use left and reight arrows to navigate between slides.')
+			.addClass('ik_readersonly information')
+			.appendTo($elem);	
 		
 		plugin.navbuttons = $navbar.children('li');
 		plugin.slides.first().addClass('active');
@@ -82,6 +105,52 @@
 		plugin.startTimer({'data':{'plugin': plugin}});
 		
 	};
+	
+
+	/**
+	* Handles keydown event on the next/prev links.
+	*
+	* @param {Object} event - Keyboard event.
+	* @param {object} event.data - Event data.
+	* @param {object} event.data.plugin - Reference to plugin.
+	*/
+
+	Plugin.prototype.onFocus = function (event) {
+		var plugin = event.data.plugin;
+
+		plugin.stopTimer({'data':{'plugin': plugin}});
+		if (event.type === 'focusout') {
+			plugin.element.removeAttr('aria-live');
+		}
+	}
+
+	Plugin.prototype.onBlur = function (event) {
+		var plugin = event.data.plugin;
+
+		plugin.startTimer({'data':{'plugin': plugin}});
+	}
+
+	
+
+	Plugin.prototype.onKeyDown = function (event) {
+		
+		var plugin = event.data.plugin;
+		
+		switch (event.keyCode) {
+			
+			case ik_utils.keys.left:
+				event.data = {'plugin': plugin, 'slide': 'left'};
+				plugin.gotoSlide(event);
+				break;
+			case ik_utils.keys.right:
+				event.data = {'plugin': plugin, 'slide': 'right'};
+				plugin.gotoSlide(event);
+				break;
+			case ik_utils.keys.esc:
+				plugin.element.blur();
+				break;
+		}
+	}
 	
 	/** 
 	 * Starts carousel timer. 
@@ -117,7 +186,10 @@
 		var plugin = event.data.plugin;
 		clearInterval(plugin.timer);
 		plugin.timer = null;
-		
+
+		if (event.type === 'focusin') {
+			plugin.element.attr({'aria-live': 'polite'});
+		 }		
 	};
 	
 	/** 
@@ -139,7 +211,6 @@
 		index = $active.index();
 		
 		if (typeof n === 'string') {
-			
 			if(n === 'left') {
 				direction = 'left';
 				n = index == 0 ? plugin.slides.length - 1 : --index;
@@ -155,21 +226,31 @@
 				direction = 'right';
 			}
 		}
-		
+
 		$next = plugin.slides.eq(n).addClass('next');
 		transevent = ik_utils.getTransitionEventName();
+
+		plugin.information.text(plugin.slides.eq(n).text());
+
 		$active.addClass(direction).on(transevent, {'next': $next, 'dir': direction}, function(event) {
-			
 			var active, next, dir;
 			
 			active = $(this);
 			next = event.data.next;
 			dir = event.data.dir;
 			
-			active.off( ik_utils.getTransitionEventName() )
+			active
+				.attr({
+					'aria-hidden': 'false'
+				})
+				.off( ik_utils.getTransitionEventName() )
 				.removeClass(direction + ' active');
 				
-			next.removeClass('next')
+			next
+				.attr({
+					'aria-hidden': 'true'
+				})
+				.removeClass('next')
 				.addClass('active');
 			
 		});
