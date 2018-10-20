@@ -1,7 +1,10 @@
 ;(function ( $, window, document, undefined ) {
-	
+
+	var flag = false;
+
 	var pluginName = 'ik_slider',
 		defaults = {
+			'instructions': 'Use the right and left arrow keys to increase or decrease the slider value.',
 			'minValue': 0,
 			'maxValue': 100,
 			'nowValue': 0,
@@ -47,7 +50,8 @@
 		
 			plugin.textfield
 				.attr({
-					'readonly': ''
+					'readonly': '',
+					'tabindex': -1
 				})
 				.addClass('ik_value')
 				.wrap('<div></div>'); // wrap initial element in a div
@@ -58,24 +62,42 @@
 			
 			plugin.fill = $('<div/>')
 				.addClass('ik_fill');
-			
+
 			plugin.knob = $('<div/>')
 				.attr({
-					'id': id
+					'id': id,
+					'tabindex': 0, // add this element to tab order
+					'role': 'slider', // assign role slider
+                    'aria-valuemin': plugin.options.minValue, // set slider minimum value
+                    'aria-valuemax': plugin.options.maxValue, // set slider maximum value
+                    'aria-valuenow': plugin.options.minValue, // set slider current value
+                    'aria-describedby': id + '_instructions' // add description */
 				})
 				.addClass('ik_knob')
+				.on('focus', {'plugin': plugin}, plugin.onFocus)
+				.on('keydown', {'plugin': plugin}, plugin.onKeyDown)
 				.on('mousedown', {'plugin': plugin}, plugin.onMouseDown)
 				.on('mousemove', {'plugin': plugin}, plugin.onMouseMove)
 				.on('mouseup', {'plugin': plugin}, plugin.onMouseUp)
 				.on('mouseleave', function(){ setTimeout(plugin.onMouseUp, 100, { 'data': {'plugin': plugin} }) });
 				
+			this.instructions = $('<div/>') // add instructions for screen reader users
+				.attr({
+					'id': id + '_instructions',
+					'aria-live': 'polite', // set notofocation priority to high
+					'aria-atomic': 'additions' // notify only about newly added text
+					})
+				.text(this.options.instructions)
+				.addClass('ik_readersonly')
+				.appendTo(this.element);
+
 			$('<div/>') // add slider track
 				.addClass('ik_track')
 				.append(this.fill, this.knob)
 				.prependTo(this.element);
 			
+
 			this.setValue(plugin.options.minValue); // update current value
-		
 		}
 					
 	};
@@ -89,7 +111,12 @@
 		
 		this.textfield.val(n);
 		this.options.nowValue = n;
+		this.knob
+			.attr({
+				'aria-valuenow': n
+			});
 		this.updateDisplay(n); // update display
+
 	};
 	
 	/** 
@@ -100,9 +127,8 @@
 	Plugin.prototype.updateDisplay = function (n) {
 		
 		var percent; 
-		
 		percent = (n - this.options.minValue) / (this.options.maxValue - this.options.minValue);
-			
+		
 		this.fill
 			.css({
 				'transform':'scaleX(' + percent + ')' 
@@ -116,6 +142,54 @@
 	};
 	
 
+	/**
+	* Keyboard event handler.
+	*
+	* @param {object} event - Keyboard event.
+	* @param {object} event.data - Event data.
+	* @param {object} event.data.plugin - Reference to plugin.
+	*/
+	Plugin.prototype.onFocus = function (event) {
+		console.log('hey');
+		var $elem, plugin, value;
+	
+		$elem = $(this);
+		plugin = event.data.plugin;
+		value = parseInt($elem.attr('aria-valuenow')) + plugin.options.step;
+
+		plugin.instructions.text('Use the right and left arrow keys to increase or decrease the slider value. ');
+
+	}
+
+	Plugin.prototype.onKeyDown = function (event) {
+	
+		var $elem, plugin, value;
+	
+		$elem = $(this);
+		plugin = event.data.plugin;
+	
+		switch (event.keyCode) {
+			case ik_utils.keys.right:
+				value = parseInt($elem.attr('aria-valuenow')) + plugin.options.step;
+				value = value < plugin.options.maxValue ? value : plugin.options.maxValue;     
+				plugin.setValue(value);
+				break;
+			
+			case ik_utils.keys.end:
+				plugin.setValue(plugin.options.maxValue);
+				break;
+		
+			case ik_utils.keys.left:
+				value = parseInt($elem.attr('aria-valuenow')) - plugin.options.step;
+				value = value > plugin.options.minValue ? value : plugin.options.minValue
+				plugin.setValue(value);
+				break;
+		
+			case ik_utils.keys.home:
+				plugin.setValue(plugin.options.minValue);
+				break;
+		}
+	};
 	
 	/** 
 	 * Mousedown event handler. 
