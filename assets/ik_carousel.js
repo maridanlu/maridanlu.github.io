@@ -42,7 +42,6 @@
 			})
 			.addClass('ik_carousel')
 			.on('focus', {'plugin': plugin}, plugin.onFocus)
-			.on('blur', {'plugin': plugin}, plugin.onBlur)
 			.on('keydown', {'plugin': plugin}, plugin.onKeyDown)
 			.on('mouseenter', {'plugin': plugin}, plugin.stopTimer)
 			.on('mouseleave', {'plugin': plugin}, plugin.startTimer)
@@ -88,16 +87,15 @@
 					.appendTo($navbar);
 			});
 
-		plugin.information = $('<div/>') // add instructions for screen reader users
+			$('<div/>') // add instructions for screen reader users
 			.attr({
 				'id': id + '_instructions',
-				'aria-hidden': 'true',		
-				'aria-live': 'polite', // set notofocation priority to high
-				'aria-atomic': 'additions' // notify only about newly added text				
+				'aria-hidden': 'true',
+				'aria-atomic': 'additions'
 			})
-			.text('Carousel widget. Use left and reight arrows to navigate between slides.')
-			.addClass('ik_readersonly information')
-			.appendTo($elem);	
+			.text('')
+			.addClass('ik_readersonly')
+			.appendTo($elem);
 		
 		plugin.navbuttons = $navbar.children('li');
 		plugin.slides.first().addClass('active');
@@ -119,18 +117,8 @@
 		var plugin = event.data.plugin;
 
 		plugin.stopTimer({'data':{'plugin': plugin}});
-		if (event.type === 'focusout') {
-			plugin.element.removeAttr('aria-live');
-		}
+
 	}
-
-	Plugin.prototype.onBlur = function (event) {
-		var plugin = event.data.plugin;
-
-		plugin.startTimer({'data':{'plugin': plugin}});
-	}
-
-	
 
 	Plugin.prototype.onKeyDown = function (event) {
 		
@@ -171,7 +159,10 @@
 		}
 		
 		plugin.timer = setInterval(plugin.gotoSlide, plugin.options.animationSpeed, {'data':{'plugin': plugin, 'slide': 'right'}});
-		
+
+		// if (event.type === 'focusout') {
+			plugin.element.find('.ik_readersonly').removeAttr('aria-live');
+		// }
 	};
 	
 	/** 
@@ -182,14 +173,15 @@
 	 * @param {object} event.data.plugin - Reference to plugin.
 	 */
 	Plugin.prototype.stopTimer = function (event) {
-		
 		var plugin = event.data.plugin;
 		clearInterval(plugin.timer);
 		plugin.timer = null;
 
-		if (event.type === 'focusin') {
-			plugin.element.attr({'aria-live': 'polite'});
-		 }		
+		console.log(plugin);
+		//if (event.type === 'focus') {
+			plugin.element.find('.ik_readersonly').attr({'aria-live': 'polite'}).text('Carousel widget. Use left and reight arrows to navigate between slides.');
+
+		//}		
 	};
 	
 	/** 
@@ -214,9 +206,13 @@
 			if(n === 'left') {
 				direction = 'left';
 				n = index == 0 ? plugin.slides.length - 1 : --index;
+				$elem.find('.ik_readersonly').text($elem.find('figcaption:eq('+n+')').text());	
+
 			} else {
 				direction = 'right'
 				n = index == plugin.slides.length - 1 ? 0 : ++index;
+				$elem.find('.ik_readersonly').text($elem.find('figcaption:eq('+n+')').text());	
+
 			}
 			
 		} else {
@@ -227,10 +223,9 @@
 			}
 		}
 
+
 		$next = plugin.slides.eq(n).addClass('next');
 		transevent = ik_utils.getTransitionEventName();
-
-		plugin.information.text(plugin.slides.eq(n).text());
 
 		$active.addClass(direction).on(transevent, {'next': $next, 'dir': direction}, function(event) {
 			var active, next, dir;
@@ -246,14 +241,15 @@
 				.off( ik_utils.getTransitionEventName() )
 				.removeClass(direction + ' active');
 				
+				
 			next
 				.attr({
 					'aria-hidden': 'true'
 				})
 				.removeClass('next')
-				.addClass('active');
-			
+				.addClass('active');	
 		});
+		
 		
 		plugin.navbuttons.removeClass('active').eq(n).addClass('active');
 		
